@@ -647,67 +647,8 @@ hallazgos.
 El correo duplicado ahora lo impide la restricción `UNIQUE` de la base, no solo
 la comprobación previa del controller.
 
----
-
-# LIMITACIONES CONOCIDAS
-
-Cosas que este proyecto todavía **no** hace, a propósito, porque llegan en
-laboratorios posteriores.
-
-**Las políticas RLS todavía no están escritas.** `02_roles_seguridad.sql`
-habilita Row Level Security en las siete tablas y revoca permisos a `anon` y
-`authenticated`, pero no crea políticas por paciente o por médico. Hoy el control
-de propiedad lo hace Express, no la base de datos. Se diseñarán al integrar
-Supabase Auth.
-
-**Los archivos `src/data/*.js` quedaron huérfanos.** Los seis arreglos en memoria
-ya no los requiere nadie; se conservan como referencia del seed, pero son código
-muerto.
-
-**`usuarios.auth_user_id` existe y no se usa.** La columna espera a Supabase
-Auth; mientras tanto autentica bcrypt + JWT desde Express.
-
-**Un token no se puede revocar.** Un JWT vale hasta que expira y no hay forma de
-anularlo antes. Si alguien roba un token de una hora, tiene una hora de acceso
-aunque nos demos cuenta enseguida. No hay logout real, ni lista de tokens
-revocados, ni refresh tokens. Es una característica de JWT, no un olvido: los
-tokens son autocontenidos a propósito y el servidor no lleva registro de los
-que emitió.
-
-**Solo un endpoint usa JWT.** `GET /api/auth/perfil`, y existe para probar que
-el mecanismo funciona. Los otros 37 siguen pidiendo solo la API Key.
-
-**No hay control de IDOR/BOLA.** Aunque el servidor sepa que quien llama es el
-paciente 1, nada le impide pedir los datos del paciente 2. Se comprueba que
-estés autenticado, no que el recurso sea tuyo.
-
-**No hay permisos por rol.** El rol ya viaja dentro del JWT y llega al servidor
-en `req.usuario`, pero no cambia nada: un `paciente` autenticado puede llamar
-exactamente a los mismos endpoints que un `administrador`. Ya sabemos *quién
-eres*; falta decidir *qué puedes hacer*. Eso es la autorización RBAC.
-
-**No hay forma de crear un administrador.** Es la otra cara de cerrar la
-escalada de privilegios: como el registro público siempre asigna `paciente`, por
-ahí no sale ningún administrador ni ningún médico. Falta la operación
-administrativa que los cree, y esa necesita JWT y control de rol para saber
-quién la está pidiendo.
-
-El primer administrador saldrá de un **proceso controlado de inicialización o
-seed** cuando exista base de datos: una migración o un script de arranque que
-corra del lado del servidor. Nunca del registro público.
-
----
 
 # realizar las pruebas y documentar
 SAST → Semgrep
 SCA  → npm audit
 DAST → OWASP ZAP
-
-docs y seguri
-
-
----
-
-## Alineación con la especificación del Hospital
-
-Se agregaron los recursos **Habitaciones** e **Ingresos** y los campos faltantes de Pacientes, Médicos y Citas. Ver `docs/ESPECIFICACION_API_HOSPITAL.md` y ejecutar `database/04_migracion_especificacion.sql` en Supabase antes de reiniciar la API.
