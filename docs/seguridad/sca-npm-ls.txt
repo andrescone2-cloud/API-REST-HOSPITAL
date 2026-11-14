@@ -1,0 +1,15 @@
+=== npm ls --depth=0 ===
+Sun Sep 20 08:48:21 HPS 2026
+
+api-hospital@1.0.0 C:\Users\Juan Camilo\Downloads\API_HOSPITAL
++-- cors@2.8.6
++-- dotenv@18.0.1
++-- express-rate-limit@8.7.0
++-- express-validator@7.3.2
++-- express@5.2.1
++-- helmet@8.3.0
++-- swagger-jsdoc@6.3.0
+`-- swagger-ui-express@5.0.1
+
+
+exit code: 0

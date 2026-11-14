@@ -1,0 +1,93 @@
+const {
+  generarHash
+} = require(
+  "../utils/crypto.util"
+);
+
+
+// ========================================
+// Validar configuración
+// ========================================
+
+const clavesConfiguradas = [
+  process.env.API_KEY_POSTMAN,
+  process.env.API_KEY_ADMIN,
+  process.env.API_KEY_MOVIL
+];
+
+
+if (
+  clavesConfiguradas.some(
+    (clave) => !clave
+  )
+) {
+
+  throw new Error(
+    "Faltan variables de entorno para las API Keys"
+  );
+}
+
+
+// ========================================
+// API Keys registradas
+//
+// Simula la tabla que más adelante será
+// api_keys en PostgreSQL/Supabase.
+//
+// No se guarda la API Key en claro,
+// solo su hash SHA-256.
+// ========================================
+
+const apiKeys = [
+
+  {
+    id: 1,
+
+    cliente:
+      "Postman Laboratorio",
+
+    hash: generarHash(
+      process.env.API_KEY_POSTMAN
+    ),
+
+    activa: true,
+
+    creadaEn:
+      "2026-09-15"
+  },
+
+  {
+    id: 2,
+
+    cliente:
+      "Aplicación Administrativa",
+
+    hash: generarHash(
+      process.env.API_KEY_ADMIN
+    ),
+
+    activa: true,
+
+    creadaEn:
+      "2026-09-15"
+  },
+
+  {
+    id: 3,
+
+    cliente:
+      "Aplicación Móvil",
+
+    hash: generarHash(
+      process.env.API_KEY_MOVIL
+    ),
+
+    activa: false,
+
+    creadaEn:
+      "2026-09-15"
+  }
+];
+
+
+module.exports = apiKeys;

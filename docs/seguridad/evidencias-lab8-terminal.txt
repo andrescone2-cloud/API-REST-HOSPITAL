@@ -1,0 +1,181 @@
+====================================================================
+EVIDENCIAS DE TERMINAL - LABORATORIO No. 8
+API_HOSPITAL - Bloque 4B, control del rol
+Fecha: 30 de septiembre de 2026
+====================================================================
+
+NOTA SOBRE LA API KEY
+---------------------
+La API_KEY_POSTMAN fue rotada antes de tomar estas evidencias, porque
+la anterior aparecia completa en una captura del informe.
+
+En los comandos de abajo la cabecera se muestra como:
+
+    -H "X-API-Key: <API_KEY_POSTMAN>"
+
+El valor real nunca se escribio en la terminal. Los comandos leen la
+clave del archivo .env en el momento de ejecutarse:
+
+    K=$(grep '^API_KEY_POSTMAN=' .env | cut -d= -f2-)
+
+Servidor arrancado con:
+
+    node src/app.js
+
+(sin --watch, para que no se reinicie a mitad de la secuencia y vacie
+la memoria de usuarios)
+
+
+====================================================================
+1. PRUEBAS DE ESCALADA DE PRIVILEGIOS Y AUTENTICACION
+====================================================================
+
+====================================================================
+ a) REGISTRO CON MASS ASSIGNMENT
+====================================================================
+
+Comando ejecutado:
+
+  curl -s -w '\nHTTP %{http_code}\n' -X POST http://localhost:3000/api/auth/registro \
+    -H "Content-Type: application/json" \
+    -H "X-API-Key: <API_KEY_POSTMAN>" \
+    -d '{"nombre":"Atacante Masivo","email":"hacker5@correo.com","password":"Password123!","id":9999,"rol":"administrador","activo":false,"passwordHash":"HASH_CONTROLADO","esSuperAdmin":true,"permisos":["DELETE ALL"]}'
+
+Salida:
+
+  {"mensaje":"Usuario registrado correctamente","usuario":{"id":1,"nombre":"Atacante Masivo","email":"hacker5@correo.com","rol":"paciente","activo":true}}
+  HTTP 201
+
+====================================================================
+ b) LOGIN CORRECTO
+====================================================================
+
+Comando ejecutado:
+
+  curl -s -w '\nHTTP %{http_code}\n' -X POST http://localhost:3000/api/auth/login \
+    -H "Content-Type: application/json" \
+    -H "X-API-Key: <API_KEY_POSTMAN>" \
+    -d '{"email":"hacker5@correo.com","password":"Password123!"}'
+
+Salida:
+
+  {"mensaje":"Autenticación correcta","usuario":{"id":1,"nombre":"Atacante Masivo","email":"hacker5@correo.com","rol":"paciente"}}
+  HTTP 200
+
+====================================================================
+ c) LOGIN INCORRECTO
+====================================================================
+
+Comando ejecutado:
+
+  curl -s -w '\nHTTP %{http_code}\n' -X POST http://localhost:3000/api/auth/login \
+    -H "Content-Type: application/json" \
+    -H "X-API-Key: <API_KEY_POSTMAN>" \
+    -d '{"email":"hacker5@correo.com","password":"ContrasenaEquivocada1"}'
+
+Salida:
+
+  {"mensaje":"Credenciales inválidas"}
+  HTTP 401
+
+--------------------------------------------------------------------
+LECTURA DE LOS RESULTADOS
+--------------------------------------------------------------------
+
+Prueba a) El servidor respondio 201, pero el ataque no funciono:
+
+    EL ATACANTE PIDIO              EL SERVIDOR GUARDO
+    ---------------------------    --------------------------------
+    id: 9999                       id: 1  (el siguiente que tocaba)
+    rol: "administrador"           rol: "paciente"
+    activo: false                  activo: true
+    passwordHash: HASH_CONTROLADO  hash bcrypt real de Password123!
+    esSuperAdmin: true             no existe
+    permisos: ["DELETE ALL"]       no existe
+
+    Campos del usuario creado: id, nombre, email, rol, activo
+
+Prueba b) Confirma dos cosas a la vez. Que el login funciona, y que el
+passwordHash falso NO se guardo: si "HASH_CONTROLADO" hubiera entrado,
+ninguna contrasena habria validado nunca contra el.
+
+Prueba c) Mismo usuario, contrasena equivocada. 401 con el mensaje
+generico, sin decir si fallo el correo o la contrasena.
+
+
+====================================================================
+2. SAST - SEMGREP
+====================================================================
+
+Comando:
+
+    semgrep --config p/javascript --config p/nodejs --config p/owasp-top-ten src/
+
+Resumen final (literal de sast-semgrep-lab8.txt):
+
+┌──────────────┐
+│ Scan Summary │
+└──────────────┘
+✅ Scan completed successfully.
+ • Findings: 0 (0 blocking)
+ • Rules run: 73
+ • Targets scanned: 40
+ • Parsed lines: ~100.0%
+ • No ignore information available
+Ran 73 rules on 40 files: 0 findings.
+
+40 archivos, los mismos que en el Lab 7. En este laboratorio no se
+creo ningun archivo: se modificaron tres.
+
+
+====================================================================
+3. SCA - NPM AUDIT
+====================================================================
+
+Comando:
+
+    npm audit
+
+Salida (literal de sca-npm-audit-lab8.txt):
+
+    found 0 vulnerabilities
+
+Dependencias directas (npm ls --depth=0):
+
+    +-- bcrypt@6.0.0
+    +-- cors@2.8.6
+    +-- dotenv@18.0.1
+    +-- express-rate-limit@8.7.0
+    +-- express-validator@7.3.2
+    +-- express@5.2.1
+    +-- helmet@8.3.0
+    +-- swagger-jsdoc@6.3.0
+    `-- swagger-ui-express@5.0.1
+
+Las mismas 9 del Lab 7. En este laboratorio no se instalo nada.
+
+
+====================================================================
+4. EL CODIGO ORIGINAL DE validarRegistro
+====================================================================
+
+Ver la seccion correspondiente en la respuesta y en
+informe-lab8-hospital.md. Resumen de lo que hay registrado:
+
+  - En docs/seguridad/informe-lab8-hospital.md, lineas 33-34:
+
+        body("rol")
+          .isIn(ROLES)
+
+  - En docs/seguridad/informe-lab8-hospital.md, linea 453:
+
+        body("rol").isIn(ROLES)
+
+  - En docs/seguridad/informe-lab7-hospital.md, linea 209:
+
+        El validador hace `.isIn(ROLES)`.
+
+NO existe copia del archivo anterior al Lab 8. No hay repositorio git
+en este proyecto ni archivos .bak, asi que no hay forma de verificar
+el bloque completo (incluida la linea .withMessage) contra una fuente
+independiente.

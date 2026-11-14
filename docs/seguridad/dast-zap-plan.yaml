@@ -1,0 +1,136 @@
+# ============================================================
+# Plan de automatizacion DAST - OWASP ZAP Automation Framework
+# Proyecto: API_HOSPITAL - Laboratorio No.5, Bloque 2
+#
+# Requisitos antes de lanzarlo:
+#   1. API levantada con el limite subido solo para el escaneo:
+#        RATE_LIMIT_MAX=100000 npm run dev
+#      Con el valor de servicio (100) el Active Scan se llena de 429.
+#   2. http://localhost:3000/openapi.json respondiendo 200.
+#   3. La variable de entorno API_KEY exportada en la terminal desde la
+#      que se lanza ZAP. El plan la lee como ${API_KEY}; la clave NO
+#      esta escrita en este archivo. Sin ella, todo /api responde 401
+#      y el Active Scan no escanea nada.
+#
+# Las rutas de este plan son relativas al directorio que contiene
+# el propio plan (docs/seguridad/), no al directorio desde donde
+# se lanza ZAP. Por eso reportDir es "." y los informes quedan
+# junto a este archivo.
+# ============================================================
+
+env:
+  contexts:
+    - name: "API_HOSPITAL"
+      urls:
+        - "http://localhost:3000"
+      includePaths:
+        - "http://localhost:3000/api.*"
+      excludePaths:
+        - "http://localhost:3000/api-docs.*"
+
+  # La clave se toma de la variable de entorno API_KEY del sistema.
+  # La doc del AF: las vars "pueden referirse a variables de entorno
+  # del sistema", y ante un mismo nombre gana la del sistema.
+  vars:
+    apiKey: "${API_KEY}"
+
+  parameters:
+    failOnError: false
+    failOnWarning: false
+    progressToStdout: true
+
+jobs:
+  # ----------------------------------------------------------
+  # 0. Inyectar la cabecera X-API-Key en todas las peticiones
+  #    a /api/
+  #
+  #    El contexto del AF no tiene seccion de headers. El
+  #    mecanismo que ZAP 2.17 soporta para esto es el job
+  #    "replacer" del addon replacer.
+  #
+  #    matchType req_header = "Request Header (will add if not
+  #    present)": matchString es el NOMBRE de la cabecera, y si
+  #    no viene en la peticion, se anade con replacementString.
+  #
+  #    Va el primero para que todo el trafico posterior, incluido
+  #    el que genera el import de OpenAPI, ya lleve la cabecera.
+  #
+  #    El regex termina en /api/ con barra a proposito: asi la
+  #    clave NO se manda a /api-docs ni a /openapi.json, que son
+  #    publicos y no la necesitan.
+  # ----------------------------------------------------------
+  - type: replacer
+    parameters:
+      deleteAllRules: true
+    rules:
+      - description: "Inyectar X-API-Key en las peticiones a /api/"
+        url: "http://localhost:3000/api/.*"
+        matchType: "req_header"
+        matchString: "X-API-Key"
+        matchRegex: false
+        replacementString: "${apiKey}"
+
+  # ----------------------------------------------------------
+  # 1. Importar la definicion OpenAPI
+  #    Alimenta el arbol de sitios con los 34 endpoints sin
+  #    necesidad de spider.
+  # ----------------------------------------------------------
+  - type: openapi
+    parameters:
+      apiUrl: "http://localhost:3000/openapi.json"
+      targetUrl: "http://localhost:3000"
+      context: "API_HOSPITAL"
+
+  # ----------------------------------------------------------
+  # 2. Esperar al Passive Scan de lo importado
+  # ----------------------------------------------------------
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 5
+
+  # ----------------------------------------------------------
+  # 3. Active Scan
+  # ----------------------------------------------------------
+  - type: activeScan
+    parameters:
+      context: "API_HOSPITAL"
+      maxScanDurationInMins: 25
+      maxRuleDurationInMins: 4
+      threadPerHost: 4
+
+  # ----------------------------------------------------------
+  # 4. Esperar al Passive Scan del trafico generado por el
+  #    Active Scan
+  # ----------------------------------------------------------
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 5
+
+  # ----------------------------------------------------------
+  # 5. Informes: mismo nombre base, tres formatos.
+  #    Cada plantilla anade su propia extension, asi que no se
+  #    pisan entre si:
+  #      dast-zap-reporte-autenticado.html
+  #      dast-zap-reporte-autenticado.json
+  #      dast-zap-reporte-autenticado.md
+  # ----------------------------------------------------------
+  - type: report
+    parameters:
+      template: "traditional-html"
+      reportDir: "."
+      reportFile: "dast-zap-reporte-autenticado"
+      reportTitle: "API_HOSPITAL - Reporte DAST con OWASP ZAP"
+
+  - type: report
+    parameters:
+      template: "traditional-json"
+      reportDir: "."
+      reportFile: "dast-zap-reporte-autenticado"
+      reportTitle: "API_HOSPITAL - Reporte DAST con OWASP ZAP"
+
+  - type: report
+    parameters:
+      template: "traditional-md"
+      reportDir: "."
+      reportFile: "dast-zap-reporte-autenticado"
+      reportTitle: "API_HOSPITAL - Reporte DAST con OWASP ZAP"

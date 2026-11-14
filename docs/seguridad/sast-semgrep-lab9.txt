@@ -1,0 +1,35 @@
+=== semgrep --config p/javascript --config p/nodejs --config p/owasp-top-ten src/ (LAB 9) ===
+Fri Oct  2 00:16:41 HPS 2026
+
+               
+               
+┌─────────────┐
+│ Scan Status │
+└─────────────┘
+  Scanning 42 files tracked by git with 563 Code rules:
+                                                                                                                        
+  Language      Rules   Files          Origin      Rules                                                                
+ ─────────────────────────────        ───────────────────                                                               
+  js               68      42          Community     563                                                                
+  <multilang>       5      42                                                                                           
+                                                                                                                        
+                
+                
+┌──────────────┐
+│ Scan Summary │
+└──────────────┘
+✅ Scan completed successfully.
+ • Findings: 0 (0 blocking)
+ • Rules run: 73
+ • Targets scanned: 42
+ • Parsed lines: ~100.0%
+ • No ignore information available
+Ran 73 rules on 42 files: 0 findings.
+(need more rules? `semgrep login` for additional free Semgrep Registry rules)
+
+
+A new version of Semgrep is available. See https://semgrep.dev/docs/upgrading
+If Semgrep missed a finding, please send us feedback to let us know!
+See https://semgrep.dev/docs/reporting-false-negatives/
+
+exit code: 0
