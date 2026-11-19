@@ -13,6 +13,12 @@ const usuariosService =
 const ingresosService =
   require("../services/ingresos.service");
 
+const historialService =
+  require("../services/historial.service");
+
+const recetasService =
+  require("../services/recetas.service");
+
 const mismoId = (a, b) =>
   a != null && b != null && String(a) === String(b);
 
@@ -383,6 +389,20 @@ const eliminarPaciente = async (req, res, next) => {
       return res.status(409).json({
         mensaje:
           "No se puede eliminar el paciente porque tiene ingresos asociados"
+      });
+    }
+
+    if (await historialService.pacienteTieneHistorial(id)) {
+      return res.status(409).json({
+        mensaje:
+          "No se puede eliminar el paciente porque tiene historial médico"
+      });
+    }
+
+    if (await recetasService.pacienteTieneRecetas(id)) {
+      return res.status(409).json({
+        mensaje:
+          "No se puede eliminar el paciente porque tiene recetas asociadas"
       });
     }
 

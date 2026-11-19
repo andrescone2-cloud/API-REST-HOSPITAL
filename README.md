@@ -14,7 +14,9 @@ Construir una API REST para gestionar:
 - consultorios;
 - citas médicas;
 - habitaciones;
-- ingresos / hospitalizaciones.
+- ingresos / hospitalizaciones;
+- historial médico;
+- recetas médicas.
 
 El proyecto permite formalizar:
 
@@ -111,6 +113,8 @@ API_HOSPITAL/
 │   │   ├── especialidades.controller.js
 │   │   ├── habitaciones.controller.js
 │   │   ├── ingresos.controller.js
+│   │   ├── historial.controller.js
+│   │   ├── recetas.controller.js
 │   │   ├── medicos.controller.js
 │   │   └── pacientes.controller.js
 │   │
@@ -138,6 +142,8 @@ API_HOSPITAL/
 │   │   ├── especialidades.validator.js
 │   │   ├── habitaciones.validator.js
 │   │   ├── ingresos.validator.js
+│   │   ├── historial.validator.js
+│   │   ├── recetas.validator.js
 │   │   ├── medicos.validator.js
 │   │   ├── pacientes.validator.js
 │   │   └── validar.middleware.js
@@ -149,6 +155,8 @@ API_HOSPITAL/
 │   │   ├── especialidades.routes.js
 │   │   ├── habitaciones.routes.js
 │   │   ├── ingresos.routes.js
+│   │   ├── historial.routes.js
+│   │   ├── recetas.routes.js
 │   │   ├── medicos.routes.js
 │   │   ├── pacientes.routes.js
 │   │   └── seguridad.routes.js
@@ -160,19 +168,35 @@ API_HOSPITAL/
 │   │   ├── especialidades.service.js
 │   │   ├── habitaciones.service.js
 │   │   ├── ingresos.service.js
+│   │   ├── historial.service.js
+│   │   ├── recetas.service.js
 │   │   ├── medicos.service.js
 │   │   ├── pacientes.service.js
 │   │   └── usuarios.service.js
 │   │
 │   ├── utils/
+│   │   ├── clinico.util.js
 │   │   ├── crypto.util.js
 │   │   └── password.util.js
 │   │
 │   └── app.js
 │
+├── public/
+│   ├── index.html
+│   ├── css/
+│   │   └── app.css
+│   └── js/
+│       ├── main.js
+│       ├── api.js
+│       ├── ui.js
+│       ├── crud.js
+│       ├── vistas.js
+│       └── config.js
+│
 ├── database/
 │   ├── 04_migracion_especificacion.sql
-│   └── 05_trazabilidad_ingresos.sql
+│   ├── 05_trazabilidad_ingresos.sql
+│   └── 06_historial_recetas.sql
 │
 ├── scripts/
 │   └── migrar-especificacion.js
@@ -309,7 +333,7 @@ un cliente distinto según la clave enviada.
 
 # ENDPOINTS
 
-47 en total. Todos bajo `/api` exigen `X-API-Key`.
+58 en total. Todos bajo `/api` exigen `X-API-Key`.
 
 | Métodos | Ruta |
 |---|---|
@@ -333,6 +357,15 @@ un cliente distinto según la clave enviada.
 | GET, POST | `/api/ingresos` |
 | GET | `/api/ingresos/{id}` |
 | PATCH | `/api/ingresos/{id}/dar-alta` |
+| GET | `/api/historial/mi-historial` |
+| GET, POST | `/api/historial` |
+| GET | `/api/historial/paciente/{pacienteId}` |
+| GET | `/api/historial/{id}` |
+| GET | `/api/recetas/mis-recetas` |
+| GET, POST | `/api/recetas` |
+| GET | `/api/recetas/paciente/{pacienteId}` |
+| GET | `/api/recetas/{id}` |
+| PATCH | `/api/recetas/{id}/estado` |
 | GET | `/api/seguridad/cliente` |
 | POST | `/api/auth/registro` |
 | POST | `/api/auth/login` |
@@ -349,6 +382,24 @@ de alta no puede ser anterior a la de ingreso. Cada ingreso guarda quién lo
 registró (`registradoPor`), quién dio el alta (`altaPor`) y cuándo se creó
 (`creadoEn`); los toma el servidor del JWT, el cliente no puede enviarlos. `correo` y `licenciaMedica` se
 aceptan como alias de `email` y `registroMedico`.
+
+**Interfaz web.** La API sirve una aplicación web en `http://localhost:3000/app`
+(carpeta `public/`, sin compilación ni dependencias nuevas). Inicia sesión con correo y
+contraseña (no usa API Key: el login es público y los recursos van con JWT) y muestra
+las secciones según el rol: el administrador gestiona todo; el médico, pacientes,
+habitaciones, ingresos, historial y recetas; el paciente, sus citas, su historial y sus
+recetas (`/api/historial/mi-historial` y `/api/recetas/mis-recetas`). Al crear o editar un
+paciente o médico, el administrador puede crear su cuenta de acceso (se vincula con `usuarioId`);
+sin esa vinculación, el usuario no puede ver su sección. Todo dato de la
+API se inserta como texto (nunca como HTML) y los scripts son archivos propios, así que
+cumple la CSP de Helmet. Si el frontend se sirve desde otro origen, cambie `API_BASE` en
+`public/js/config.js` y agregue ese origen a `ALLOWED_ORIGIN`.
+
+Historial médico y recetas también usan JWT y rol. El historial solo se agrega
+(no se edita ni se borra). Un médico firma siempre con su propio registro y debe
+estar activo; un paciente solo ve su historial y sus recetas (403 si pide los de
+otro). Una receta guarda sus medicamentos en una transacción, avisa si coinciden
+con las alergias del paciente y pasa de `activa` a `dispensada` o `anulada`.
 
 ---
 
@@ -588,7 +639,7 @@ recursos del hospital consultan PostgreSQL.
 
 | Service | Origen |
 |---|---|
-| especialidades, medicos, pacientes, consultorios, citas, habitaciones, ingresos, usuarios | PostgreSQL |
+| especialidades, medicos, pacientes, consultorios, citas, habitaciones, ingresos, historial_medico, recetas, receta_medicamentos, usuarios | PostgreSQL |
 | apiKeys | memoria, a propósito: salen de `.env` |
 
 ## Puesta en marcha
@@ -611,8 +662,8 @@ Pasos:
    `01` no es idempotente: no ejecutarlo dos veces.
 
    Luego `database/04_migracion_especificacion.sql` y
-   `database/05_trazabilidad_ingresos.sql` (ambas idempotentes), o
-   `node scripts/migrar-especificacion.js`, que aplica las dos.
+   `database/05_trazabilidad_ingresos.sql` y `database/06_historial_recetas.sql`
+   (todas idempotentes), o `node scripts/migrar-especificacion.js`, que aplica las tres.
 
 3. Copiar la cadena de **Connection pooling** (puerto 6543) en `DATABASE_URL`
    dentro de `.env`. Nunca en `.env.example`.

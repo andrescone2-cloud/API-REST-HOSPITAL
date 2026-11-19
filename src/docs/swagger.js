@@ -147,6 +147,22 @@ const options = {
 
       {
         name:
+          "Historial médico",
+
+        description:
+          "Historial clínico de los pacientes (solo se agrega, no se edita ni se borra)"
+      },
+
+      {
+        name:
+          "Recetas",
+
+        description:
+          "Recetas médicas con sus medicamentos y estado"
+      },
+
+      {
+        name:
           "Seguridad",
 
         description:

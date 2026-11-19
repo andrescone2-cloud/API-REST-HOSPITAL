@@ -2,7 +2,8 @@
 // Aplicar la migracion de la especificacion del Hospital
 //
 // Ejecuta database/04_migracion_especificacion.sql y
-// database/05_trazabilidad_ingresos.sql sobre la base
+// database/05_trazabilidad_ingresos.sql y
+// database/06_historial_recetas.sql sobre la base
 // que indique DATABASE_URL (.env). Es idempotente: se puede
 // repetir sin danar nada, y NO borra datos.
 //
@@ -21,10 +22,17 @@ const { pool, consultar } = require("../src/config/database");
 
 const ARCHIVOS = [
   "04_migracion_especificacion.sql",
-  "05_trazabilidad_ingresos.sql"
+  "05_trazabilidad_ingresos.sql",
+  "06_historial_recetas.sql"
 ].map((nombre) => path.resolve(__dirname, "../database", nombre));
 
-const tablasNuevas = ["habitaciones", "ingresos"];
+const tablasNuevas = [
+  "habitaciones",
+  "ingresos",
+  "historial_medico",
+  "recetas",
+  "receta_medicamentos"
+];
 
 const main = async () => {
   for (const archivo of ARCHIVOS) {

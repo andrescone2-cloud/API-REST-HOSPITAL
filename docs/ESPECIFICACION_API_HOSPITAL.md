@@ -123,3 +123,76 @@ curl "${H[@]}" -X PATCH $API/ingresos/1/dar-alta -d '{"fechaAlta":"2000-01-01"}'
 # Correo con formato inválido (400)
 curl "${H[@]}" -X POST $API/pacientes -d '{"nombre":"Pedro Pérez","documento":"1234567890","correo":"no-es-correo","telefono":"3001112233","fechaNacimiento":"1985-01-01"}'
 ```
+
+## 7. Historial médico y recetas (`database/06_historial_recetas.sql`)
+
+Tablas nuevas: `historial_medico`, `recetas` y `receta_medicamentos`. Todas con RLS activado y permisos revocados a
+`anon`/`authenticated`, como el resto. `node scripts/migrar-especificacion.js` aplica la 04, la 05 y la 06.
+
+| Endpoint | Roles | Qué hace |
+|---|---|---|
+| `GET /api/historial` (`?pacienteId=`) | administrador, médico | Lista el historial |
+| `GET /api/historial/paciente/{pacienteId}` | administrador, médico, **paciente (solo el suyo)** | Historial de un paciente |
+| `GET /api/historial/{id}` | administrador, médico, paciente (solo el suyo) | Una entrada |
+| `POST /api/historial` | administrador, médico | Agrega una entrada |
+| `GET /api/recetas` (`?pacienteId=&estado=`) | administrador, médico | Lista recetas con sus medicamentos |
+| `GET /api/recetas/paciente/{pacienteId}` | administrador, médico, paciente (solo el suyo) | Recetas de un paciente |
+| `GET /api/recetas/{id}` | administrador, médico, paciente (solo el suyo) | Una receta |
+| `POST /api/recetas` | administrador, médico | Emite una receta |
+| `PATCH /api/recetas/{id}/estado` | administrador, médico | `dispensada` o `anulada` |
+
+Reglas:
+- **El historial solo se agrega**: no hay `PUT` ni `DELETE`, para no perder ni alterar historiales clínicos.
+- **Quién firma:** un médico siempre firma con su propio registro (no puede actuar a nombre de otro: 403); el
+  administrador debe indicar `medicoId`. El médico debe estar `activo` (409 si no). `creadoPor` sale del JWT.
+- **Propiedad:** un paciente solo ve su historial y sus recetas (403 en `/paciente/{id}` de otro; 404 en `/{id}`
+  de otro, para no revelar que existe).
+- **Vínculos:** `citaId` debe ser una cita del mismo paciente; `historialId` de una receta debe ser una entrada del
+  mismo paciente (400 si no).
+- **Receta:** entre 1 y 20 medicamentos (nombre, dosis, frecuencia, `duracionDias` 1 a 365, instrucciones opcionales);
+  receta y medicamentos se guardan en **una transacción**. Nace `activa`; solo puede pasar a `dispensada` o `anulada`
+  (estados finales, 409 si se intenta otro cambio).
+- **Alergias:** si las `alergias` del paciente coinciden con un medicamento, la respuesta 201 incluye `advertencias`.
+  No bloquea la receta: la decisión es del médico.
+- **No se elimina un paciente** con historial médico o recetas (409).
+
+Ejemplo de receta:
+
+```json
+POST /api/recetas
+{
+  "pacienteId": 1,
+  "historialId": 1,
+  "indicaciones": "Reposo y abundante líquido",
+  "medicamentos": [
+    { "medicamento": "Amoxicilina", "dosis": "500 mg", "frecuencia": "Cada 8 horas", "duracionDias": 7 }
+  ]
+}
+```
+
+## 8. Interfaz web (`public/`)
+
+Aplicación de una sola página (JavaScript nativo, sin compilar) servida por la propia API en
+`http://localhost:3000/app`. Mismo origen que la API: no necesita CORS.
+
+| Rol | Secciones |
+|---|---|
+| administrador | Inicio, Pacientes, Médicos, Especialidades, Consultorios, Citas, Habitaciones, Ingresos, Historial médico, Recetas |
+| médico | Inicio, Pacientes (lectura), Médicos, Mis citas, Habitaciones, Ingresos, Historial médico, Recetas |
+| paciente | Inicio, Médicos, Mis citas, Mi historial, Mis recetas |
+
+- **Sesión:** `POST /api/auth/login` con correo y contraseña. El token y el usuario se guardan en `sessionStorage`
+  (se borran al cerrar la pestaña). Si la API responde 401 con una sesión iniciada, vuelve al login.
+- **Sin API Key en el navegador:** el login es público y los recursos van con JWT, como define `app.js`.
+- **Seguridad:** los datos de la API se insertan como texto (no como HTML) y no hay scripts en línea, por lo que
+  cumple la CSP de Helmet; un `<img onerror=…>` en un dato se muestra literalmente y no se ejecuta.
+- **Cuentas de acceso:** para que un médico o paciente entre y use su sección, su cuenta debe estar vinculada a su
+  ficha (`usuarioId`). Al crear o editar la ficha, el administrador marca «Crear una cuenta de acceso» e indica la
+  contraseña inicial: se guarda la ficha, se crea el usuario (`POST /api/usuarios`, correo de la ficha y rol
+  `paciente` o `medico`) y se vincula con `PATCH`. Si falla la cuenta, la ficha no se pierde y se puede reintentar al editar.
+- **Flujos:** registrar ingreso y alta; historial con cita opcional; receta con filas de medicamentos, aviso de
+  alergias y «Emitir receta» desde una entrada del historial; dispensar o anular recetas.
+- **Endpoints añadidos para el rol paciente:** `GET /api/historial/mi-historial` y `GET /api/recetas/mis-recetas`
+  (siguen la idea de `/api/citas/mis-citas`).
+- **Otro origen:** si sirve el frontend aparte (p. ej. Vite en 5173), cambie `API_BASE` en `public/js/config.js` y
+  agregue ese origen a `ALLOWED_ORIGIN` en el `.env`.

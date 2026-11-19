@@ -9,6 +9,12 @@ const express =
   );
 
 
+const path =
+  require(
+    "path"
+  );
+
+
 const helmet =
   require(
     "helmet"
@@ -83,6 +89,18 @@ const habitacionesRoutes =
 const ingresosRoutes =
   require(
     "./routes/ingresos.routes"
+  );
+
+
+const historialRoutes =
+  require(
+    "./routes/historial.routes"
+  );
+
+
+const recetasRoutes =
+  require(
+    "./routes/recetas.routes"
   );
 
 
@@ -289,6 +307,8 @@ const rutasRecursosJWT = new Set([
   "/citas",
   "/habitaciones",
   "/ingresos",
+  "/historial",
+  "/recetas",
   "/usuarios"
 ]);
 
@@ -364,6 +384,22 @@ app.use(
 
 
 // ========================================
+// Interfaz web (frontend)
+// ========================================
+
+// Archivos estaticos de /public, en http://localhost:3000/app
+// Mismo origen que la API: no necesita CORS. Los scripts van en
+// archivos propios (sin codigo en linea) para cumplir la politica
+// de seguridad de contenido (CSP) de Helmet.
+app.use(
+  "/app",
+  express.static(
+    path.join(__dirname, "..", "public")
+  )
+);
+
+
+// ========================================
 // Ruta principal
 // ========================================
 
@@ -429,6 +465,18 @@ app.use(
 app.use(
   "/api/ingresos",
   ingresosRoutes
+);
+
+
+app.use(
+  "/api/historial",
+  historialRoutes
+);
+
+
+app.use(
+  "/api/recetas",
+  recetasRoutes
 );
 
 
